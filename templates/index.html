@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: #F5F5F5;
+            color: #1A1A1A;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 40px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        h1 {
+            font-family: "Source Han Serif SC", "Noto Serif SC", "STSong", "SimSun", serif;
+            font-size: 32px;
+            font-weight: 600;
+            color: #1A1A1A;
+            margin-bottom: 12px;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #999999;
+            font-weight: 400;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 40px;
+            border-bottom: 1px solid #E5E5E5;
+        }
+
+        .tab {
+            padding: 16px 0;
+            font-size: 15px;
+            font-weight: 500;
+            color: #666666;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+            position: relative;
+            bottom: -1px;
+        }
+
+        .tab:hover {
+            color: #1A1A1A;
+        }
+
+        .tab.active {
+            color: #1A1A1A;
+            border-bottom-color: #C9A063;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .card {
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 48px;
+            margin-bottom: 32px;
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
+        }
+
+        .form-group {
+            margin-bottom: 32px;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #1A1A1A;
+            margin-bottom: 12px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 16px;
+            font-size: 15px;
+            font-family: inherit;
+            color: #1A1A1A;
+            background: #FAFAFA;
+            border: 1px solid #E5E5E5;
+            border-radius: 12px;
+            resize: vertical;
+            transition: all 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #C9A063;
+            background: #FFFFFF;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 15px;
+            font-family: inherit;
+            color: #1A1A1A;
+            background: #FAFAFA;
+            border: 1px solid #E5E5E5;
+            border-radius: 12px;
+            transition: all 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #C9A063;
+            background: #FFFFFF;
+        }
+
+        button {
+            padding: 14px 32px;
+            font-size: 15px;
+            font-weight: 500;
+            color: #FFFFFF;
+            background: #1A1A1A;
+            border: none;
+            border-radius: 24px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #333333;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #CCCCCC;
+            cursor: not-allowed;
+        }
+
+        .result-box {
+            background: #FAFAFA;
+            border: 1px solid #E5E5E5;
+            border-radius: 12px;
+            padding: 24px;
+            margin-top: 32px;
+            min-height: 120px;
+        }
+
+        .result-box.empty {
+            color: #999999;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .answer {
+            font-size: 15px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            color: #1A1A1A;
+        }
+
+        .sources {
+            margin-top: 40px;
+            padding-top: 32px;
+            border-top: 1px solid #E5E5E5;
+        }
+
+        .sources h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #666666;
+            margin-bottom: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        .source-item {
+            background: #FFFFFF;
+            border: 1px solid #E5E5E5;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .source-item:hover {
+            border-color: #C9A063;
+        }
+
+        .source-item .timestamp {
+            color: #999999;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .source-item .content {
+            color: #1A1A1A;
+            line-height: 1.6;
+            font-size: 14px;
+            background: #FAFAFA;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 3px solid #C9A063;
+        }
+
+        .note-actions {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .note-actions button {
+            padding: 6px 16px;
+            font-size: 13px;
+            background: #F5F5F5;
+            color: #666666;
+            border: 1px solid #E5E5E5;
+        }
+
+        .note-actions button:hover {
+            background: #E5E5E5;
+            color: #1A1A1A;
+            transform: none;
+        }
+
+        .note-actions .delete-btn:hover {
+            background: #FEE;
+            color: #C84430;
+            border-color: #C84430;
+        }
+
+        .success-msg {
+            color: #2D7A4F;
+            font-size: 14px;
+            margin-top: 16px;
+        }
+
+        .error-msg {
+            color: #C84430;
+            font-size: 14px;
+            margin-top: 16px;
+        }
+
+        .loading {
+            color: #999999;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>学习助手</h1>
+            <p class="subtitle">记录知识，随时问答</p>
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('notes')">笔记</div>
+            <div class="tab" onclick="switchTab('ask')">问答</div>
+        </div>
+
+        <!-- 笔记页面 -->
+        <div id="notes-tab" class="tab-content active">
+            <!-- 添加笔记 -->
+            <div class="card">
+                <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 24px;">添加笔记</h2>
+                <div class="form-group">
+                    <label>笔记内容</label>
+                    <textarea id="note-content" placeholder="粘贴你的学习笔记..."></textarea>
+                </div>
+                <button onclick="addNote()">保存笔记</button>
+                <div id="add-message"></div>
+            </div>
+
+            <!-- 笔记库 -->
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                    <h2 style="font-size: 18px; font-weight: 600;">笔记库</h2>
+                    <button onclick="loadNotesList()" style="padding: 8px 20px; font-size: 14px;">刷新</button>
+                </div>
+                <div id="notes-list"></div>
+            </div>
+        </div>
+
+        <!-- 问答 -->
+        <div id="ask-tab" class="tab-content">
+            <div class="card">
+                <div class="form-group">
+                    <label>你的问题</label>
+                    <input type="text" id="question" placeholder="例如：BE代码是什么意思？">
+                </div>
+                <button onclick="askQuestion()">提问</button>
+
+                <div id="answer-box" class="result-box empty">
+                    答案会显示在这里
+                </div>
+
+                <div id="sources-box"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tab) {
+            // 更新标签样式
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            if (tab === 'notes') {
+                document.querySelectorAll('.tab')[0].classList.add('active');
+                document.getElementById('notes-tab').classList.add('active');
+                loadNotesList();
+            } else {
+                document.querySelectorAll('.tab')[1].classList.add('active');
+                document.getElementById('ask-tab').classList.add('active');
+            }
+        }
+
+        async function addNote() {
+            const content = document.getElementById('note-content').value.trim();
+            const msgEl = document.getElementById('add-message');
+
+            if (!content) {
+                msgEl.innerHTML = '<p class="error-msg">请输入笔记内容</p>';
+                return;
+            }
+
+            msgEl.innerHTML = '<p class="loading">保存中...</p>';
+
+            try {
+                const response = await fetch('/api/notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    msgEl.innerHTML = '<p class="success-msg">✓ 保存成功</p>';
+                    document.getElementById('note-content').value = '';
+                    loadNotesList(); // 刷新笔记列表
+                } else {
+                    msgEl.innerHTML = `<p class="error-msg">${data.error}</p>`;
+                }
+            } catch (error) {
+                msgEl.innerHTML = '<p class="error-msg">保存失败，请检查服务器</p>';
+            }
+        }
+
+        async function loadNotesList() {
+            const listEl = document.getElementById('notes-list');
+            listEl.innerHTML = '<p class="loading">加载中...</p>';
+
+            try {
+                const response = await fetch('/api/notes');
+                const data = await response.json();
+
+                if (response.ok && data.notes) {
+                    if (data.notes.length === 0) {
+                        listEl.innerHTML = '<p style="color: #999999; text-align: center; padding: 40px 0;">暂无笔记</p>';
+                        return;
+                    }
+
+                    let html = '';
+                    data.notes.forEach(note => {
+                        html += `
+                            <div class="source-item" data-id="${note.id}">
+                                <div class="timestamp">${note.timestamp}</div>
+                                <div class="content">${note.content.substring(0, 300)}${note.content.length > 300 ? '...' : ''}</div>
+                                <div class="note-actions">
+                                    <button onclick="editNoteInList('${note.id}', \`${note.content.replace(/`/g, '\\`').replace(/\$/g, '\\$').replace(/\n/g, '\\n')}\`)">编辑</button>
+                                    <button class="delete-btn" onclick="deleteNoteFromList('${note.id}')">删除</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    listEl.innerHTML = html;
+                } else {
+                    listEl.innerHTML = '<p class="error-msg">加载失败</p>';
+                }
+            } catch (error) {
+                listEl.innerHTML = '<p class="error-msg">加载失败，请检查服务器</p>';
+            }
+        }
+
+        async function editNoteInList(noteId, content) {
+            const newContent = prompt('编辑笔记内容：', content);
+
+            if (newContent === null || newContent.trim() === '') {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/notes/${noteId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: newContent.trim() })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('✓ 更新成功');
+                    loadNotesList();
+                } else {
+                    alert('更新失败：' + data.error);
+                }
+            } catch (error) {
+                alert('更新失败，请检查服务器');
+            }
+        }
+
+        async function deleteNoteFromList(noteId) {
+            if (!confirm('确定要删除这条笔记吗？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/notes/${noteId}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('✓ 删除成功');
+                    loadNotesList();
+                } else {
+                    alert('删除失败：' + data.error);
+                }
+            } catch (error) {
+                alert('删除失败，请检查服务器');
+            }
+        }
+
+        async function askQuestion() {
+            const question = document.getElementById('question').value.trim();
+            const answerBox = document.getElementById('answer-box');
+            const sourcesBox = document.getElementById('sources-box');
+
+            if (!question) {
+                answerBox.className = 'result-box';
+                answerBox.innerHTML = '<p class="error-msg">请输入问题</p>';
+                return;
+            }
+
+            answerBox.className = 'result-box';
+            answerBox.innerHTML = '<p class="loading">思考中...</p>';
+            sourcesBox.innerHTML = '';
+
+            try {
+                const response = await fetch('/api/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    answerBox.innerHTML = `<div class="answer">${data.answer}</div>`;
+
+                    if (data.sources && data.sources.length > 0) {
+                        let sourcesHtml = '<div class="sources"><h3>来源笔记</h3>';
+                        data.sources.forEach(source => {
+                            sourcesHtml += `
+                                <div class="source-item" data-id="${source.id}">
+                                    <div class="timestamp">${source.timestamp}</div>
+                                    <div class="content">${source.content.substring(0, 200)}${source.content.length > 200 ? '...' : ''}</div>
+                                    <div class="note-actions">
+                                        <button onclick="editNote('${source.id}', \`${source.content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">编辑</button>
+                                        <button class="delete-btn" onclick="deleteNote('${source.id}')">删除</button>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        sourcesHtml += '</div>';
+                        sourcesBox.innerHTML = sourcesHtml;
+                    }
+                } else {
+                    answerBox.innerHTML = `<p class="error-msg">${data.error}</p>`;
+                }
+            } catch (error) {
+                answerBox.innerHTML = '<p class="error-msg">请求失败，请检查服务器</p>';
+            }
+        }
+
+        async function editNote(noteId, content) {
+            const newContent = prompt('编辑笔记内容：', content);
+
+            if (newContent === null || newContent.trim() === '') {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/notes/${noteId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: newContent.trim() })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('✓ 更新成功');
+                    // 刷新当前问题的答案
+                    const question = document.getElementById('question').value;
+                    if (question) {
+                        askQuestion();
+                    }
+                } else {
+                    alert('更新失败：' + data.error);
+                }
+            } catch (error) {
+                alert('更新失败，请检查服务器');
+            }
+        }
+
+        async function deleteNote(noteId) {
+            if (!confirm('确定要删除这条笔记吗？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/notes/${noteId}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('✓ 删除成功');
+                    // 移除该笔记卡片
+                    const noteElement = document.querySelector(`[data-id="${noteId}"]`);
+                    if (noteElement) {
+                        noteElement.remove();
+                    }
+                } else {
+                    alert('删除失败：' + data.error);
+                }
+            } catch (error) {
+                alert('删除失败，请检查服务器');
+            }
+        }
+
+        // 回车提交
+        document.getElementById('question').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                askQuestion();
+            }
+        });
+
+        // 页面加载时初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            loadNotesList();
+        });
+    </script>
+</body>
+</html>
