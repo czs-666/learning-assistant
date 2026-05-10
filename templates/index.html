@@ -524,6 +524,8 @@
                     msgEl.innerHTML = '<p class="error-msg">上传失败，请检查网络连接</p>';
                 }
                 console.error('Upload error:', error);
+                console.error('Error name:', error.name);
+                console.error('Error message:', error.message);
                 return false;
             } finally {
                 isSaving = false;

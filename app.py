@@ -17,7 +17,7 @@ app = Flask(__name__)
 UPLOAD_FOLDER = Path(__file__).parent / 'data' / 'uploads'
 UPLOAD_FOLDER.mkdir(exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB 最大文件大小
+app.config['MAX_CONTENT_LENGTH'] = 40 * 1024 * 1024  # 40MB 最大文件大小
 
 # 初始化数据库
 db = Database()
