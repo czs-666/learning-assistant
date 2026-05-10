@@ -47,8 +47,8 @@ def notes():
     if not request.json:
         return jsonify({'error': '无效的请求数据'}), 400
 
-    content = request.json.get('content', '').strip()
-    title = request.json.get('title', '').strip()
+    content = (request.json.get('content') or '').strip()
+    title = (request.json.get('title') or '').strip()
 
     if not content:
         return jsonify({'error': '内容不能为空'}), 400
@@ -75,7 +75,7 @@ def ask():
     if not request.json:
         return jsonify({'error': '无效的请求数据'}), 400
 
-    question = request.json.get('question', '').strip()
+    question = (request.json.get('question') or '').strip()
 
     if not question:
         return jsonify({'error': '问题不能为空'}), 400
@@ -134,8 +134,8 @@ def update_note(note_id):
     if not request.json:
         return jsonify({'error': '无效的请求数据'}), 400
 
-    content = request.json.get('content', '').strip()
-    title = request.json.get('title', '').strip()
+    content = (request.json.get('content') or '').strip()
+    title = (request.json.get('title') or '').strip()
 
     if not content:
         return jsonify({'error': '内容不能为空'}), 400
