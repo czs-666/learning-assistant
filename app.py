@@ -44,6 +44,9 @@ def notes():
         return jsonify({'notes': all_notes})
 
     # POST - 添加笔记
+    if not request.json:
+        return jsonify({'error': '无效的请求数据'}), 400
+
     content = request.json.get('content', '').strip()
     title = request.json.get('title', '').strip()
 
@@ -69,6 +72,9 @@ def search():
 @app.route('/api/ask', methods=['POST'])
 def ask():
     """问答"""
+    if not request.json:
+        return jsonify({'error': '无效的请求数据'}), 400
+
     question = request.json.get('question', '').strip()
 
     if not question:
@@ -125,6 +131,9 @@ def ask():
 @app.route('/api/notes/<note_id>', methods=['PUT'])
 def update_note(note_id):
     """更新笔记"""
+    if not request.json:
+        return jsonify({'error': '无效的请求数据'}), 400
+
     content = request.json.get('content', '').strip()
     title = request.json.get('title', '').strip()
 
