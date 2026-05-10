@@ -5,49 +5,29 @@
 
 from flask import Flask, render_template, request, jsonify
 import os
-import json
 from pathlib import Path
-from anthropic import Anthropic
 from datetime import datetime
+from werkzeug.utils import secure_filename
+from anthropic import Anthropic
+from database import Database
+from file_handler import FileHandler
 
 app = Flask(__name__)
 
-# 数据文件路径
-DATA_FILE = Path(__file__).parent / 'data' / 'notes.json'
-DATA_FILE.parent.mkdir(exist_ok=True)
+# 配置文件上传
+UPLOAD_FOLDER = Path(__file__).parent / 'data' / 'uploads'
+UPLOAD_FOLDER.mkdir(exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB 最大文件大小
+
+# 初始化数据库
+db = Database()
 
 # 初始化 Anthropic 客户端
 api_key = os.environ.get('ANTHROPIC_API_KEY')
 if not api_key:
     print("警告: 未设置 ANTHROPIC_API_KEY 环境变量")
 client = Anthropic(api_key=api_key) if api_key else None
-
-
-def load_notes():
-    """加载笔记数据"""
-    if DATA_FILE.exists():
-        with open(DATA_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {'notes': []}
-
-
-def save_notes(data):
-    """保存笔记数据"""
-    with open(DATA_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-def search_notes(keyword):
-    """搜索笔记"""
-    data = load_notes()
-    keyword_lower = keyword.lower()
-    results = []
-
-    for note in data['notes']:
-        if keyword_lower in note['content'].lower() or keyword_lower in note.get('title', '').lower():
-            results.append(note)
-
-    return results
 
 
 @app.route('/')
@@ -60,26 +40,17 @@ def index():
 def notes():
     """获取所有笔记或添加笔记"""
     if request.method == 'GET':
-        data = load_notes()
-        return jsonify(data)
+        all_notes = db.get_all_notes()
+        return jsonify({'notes': all_notes})
 
     # POST - 添加笔记
     content = request.json.get('content', '').strip()
+    title = request.json.get('title', '').strip()
 
     if not content:
         return jsonify({'error': '内容不能为空'}), 400
 
-    data = load_notes()
-
-    note = {
-        'id': str(len(data['notes']) + 1),
-        'content': content,
-        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    }
-
-    data['notes'].append(note)
-    save_notes(data)
-
+    note = db.add_note(content, title=title if title else None)
     return jsonify({'success': True, 'note': note})
 
 
@@ -91,7 +62,7 @@ def search():
     if not keyword:
         return jsonify({'results': []})
 
-    results = search_notes(keyword)
+    results = db.search_notes(keyword)
     return jsonify({'results': results})
 
 
@@ -107,7 +78,7 @@ def ask():
         return jsonify({'error': '未配置 API Key'}), 500
 
     # 搜索相关笔记
-    results = search_notes(question)[:3]
+    results = db.search_notes(question)[:3]
 
     if not results:
         return jsonify({
@@ -155,35 +126,76 @@ def ask():
 def update_note(note_id):
     """更新笔记"""
     content = request.json.get('content', '').strip()
+    title = request.json.get('title', '').strip()
 
     if not content:
         return jsonify({'error': '内容不能为空'}), 400
 
-    data = load_notes()
+    note = db.update_note(note_id, content, title if title else None)
 
-    for note in data['notes']:
-        if note['id'] == note_id:
-            note['content'] = content
-            note['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            save_notes(data)
-            return jsonify({'success': True, 'note': note})
+    if note is None:
+        return jsonify({'error': '笔记不存在'}), 404
 
-    return jsonify({'error': '笔记不存在'}), 404
+    return jsonify({'success': True, 'note': note})
 
 
 @app.route('/api/notes/<note_id>', methods=['DELETE'])
 def delete_note(note_id):
     """删除笔记"""
-    data = load_notes()
+    deleted = db.delete_note(note_id)
 
-    original_length = len(data['notes'])
-    data['notes'] = [note for note in data['notes'] if note['id'] != note_id]
-
-    if len(data['notes']) == original_length:
+    if not deleted:
         return jsonify({'error': '笔记不存在'}), 404
 
-    save_notes(data)
     return jsonify({'success': True})
+
+
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    """上传文件并提取文本"""
+    if 'file' not in request.files:
+        return jsonify({'error': '未选择文件'}), 400
+
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({'error': '未选择文件'}), 400
+
+    # 检查文件类型
+    if not FileHandler.is_supported(file.filename):
+        return jsonify({'error': '不支持的文件格式，仅支持 PDF、Word、TXT、Markdown'}), 400
+
+    try:
+        # 保存文件
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_filename = f"{timestamp}_{filename}"
+        file_path = app.config['UPLOAD_FOLDER'] / unique_filename
+        file.save(file_path)
+
+        # 提取文本
+        text_content, file_type = FileHandler.extract_text(str(file_path))
+
+        # 使用文件名（去掉扩展名）作为标题
+        title = Path(filename).stem
+
+        # 保存到数据库
+        note = db.add_note(
+            content=text_content,
+            source_type='file',
+            title=title,
+            file_name=filename,
+            file_type=file_type,
+            file_path=str(file_path)
+        )
+
+        return jsonify({'success': True, 'note': note})
+
+    except Exception as e:
+        # 如果出错，删除已保存的文件
+        if file_path.exists():
+            file_path.unlink()
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':

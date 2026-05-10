@@ -213,6 +213,34 @@
             position: relative;
         }
 
+        .note-item-collapsed {
+            background: #FFFFFF;
+            border: 1px solid #E5E5E5;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            transition: all 0.3s;
+        }
+
+        .note-item-collapsed:hover {
+            border-color: #C9A063;
+        }
+
+        .note-content-expanded {
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                max-height: 0;
+            }
+            to {
+                opacity: 1;
+                max-height: 1000px;
+            }
+        }
+
         .source-item:hover {
             border-color: #C9A063;
         }
@@ -231,6 +259,30 @@
             padding: 12px;
             border-radius: 8px;
             border-left: 3px solid #C9A063;
+        }
+
+        #notes-list {
+            max-height: 600px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        #notes-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #notes-list::-webkit-scrollbar-track {
+            background: #F5F5F5;
+            border-radius: 3px;
+        }
+
+        #notes-list::-webkit-scrollbar-thumb {
+            background: #C9A063;
+            border-radius: 3px;
+        }
+
+        #notes-list::-webkit-scrollbar-thumb:hover {
+            background: #B89053;
         }
 
         .note-actions {
@@ -275,6 +327,31 @@
             color: #999999;
             font-size: 14px;
         }
+
+        /* 问答高亮样式 */
+        .inline-code {
+            background: #F5F5F5;
+            color: #C84430;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+        }
+
+        .highlight-text {
+            color: #C9A063;
+            font-weight: 600;
+        }
+
+        .list-item {
+            display: block;
+            margin: 8px 0;
+            padding-left: 8px;
+        }
+
+        .answer {
+            line-height: 1.8;
+        }
     </style>
 </head>
 <body>
@@ -294,8 +371,21 @@
             <!-- 添加笔记 -->
             <div class="card">
                 <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 24px;">添加笔记</h2>
+
+                <!-- 文件上传区域 -->
                 <div class="form-group">
-                    <label>笔记内容</label>
+                    <label>上传文件</label>
+                    <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px;">
+                        <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt,.md" style="display: none;" onchange="handleFileSelect(event)">
+                        <button onclick="document.getElementById('file-input').click()" style="background: #FFFFFF; color: #1A1A1A; border: 1px solid #E5E5E5;">选择文件</button>
+                        <span id="file-name" style="font-size: 14px; color: #666666;">支持 PDF、Word、TXT、Markdown</span>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin: 24px 0; color: #999999; font-size: 14px;">或</div>
+
+                <div class="form-group">
+                    <label>手动输入笔记内容</label>
                     <textarea id="note-content" placeholder="粘贴你的学习笔记..."></textarea>
                 </div>
                 <button onclick="addNote()">保存笔记</button>
@@ -346,7 +436,77 @@
             }
         }
 
+        let selectedFile = null;
+        let isSaving = false; // 防止重复提交
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedFile = file;
+                document.getElementById('file-name').textContent = file.name;
+                document.getElementById('note-content').value = ''; // 清空手动输入
+            }
+        }
+
+        async function uploadFile() {
+            if (!selectedFile || isSaving) return false;
+
+            isSaving = true;
+            const msgEl = document.getElementById('add-message');
+            msgEl.innerHTML = '<p class="loading">上传并解析文件中...</p>';
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData,
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+                const data = await response.json();
+
+                if (response.ok) {
+                    msgEl.innerHTML = '<p class="success-msg">✓ 文件上传成功</p>';
+                    selectedFile = null;
+                    document.getElementById('file-input').value = '';
+                    document.getElementById('file-name').textContent = '支持 PDF、Word、TXT、Markdown';
+                    await loadNotesList();
+                    setTimeout(() => msgEl.innerHTML = '', 3000); // 3秒后清除消息
+                    return true;
+                } else {
+                    msgEl.innerHTML = `<p class="error-msg">${data.error || '上传失败'}</p>`;
+                    return false;
+                }
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    msgEl.innerHTML = '<p class="error-msg">上传超时，请重试</p>';
+                } else {
+                    msgEl.innerHTML = '<p class="error-msg">上传失败，请检查网络连接</p>';
+                }
+                console.error('Upload error:', error);
+                return false;
+            } finally {
+                isSaving = false;
+            }
+        }
+
         async function addNote() {
+            if (isSaving) {
+                return; // 防止重复提交
+            }
+
+            // 如果选择了文件，优先上传文件
+            if (selectedFile) {
+                await uploadFile();
+                return;
+            }
+
             const content = document.getElementById('note-content').value.trim();
             const msgEl = document.getElementById('add-message');
 
@@ -355,26 +515,48 @@
                 return;
             }
 
+            // 弹窗让用户输入标题
+            const title = prompt('给笔记起个名字（可选，直接点确定跳过）：');
+
+            // 用户点击取消则不保存
+            if (title === null) {
+                return;
+            }
+
+            isSaving = true;
             msgEl.innerHTML = '<p class="loading">保存中...</p>';
 
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+
                 const response = await fetch('/api/notes', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content })
+                    body: JSON.stringify({ content, title: title.trim() || null }),
+                    signal: controller.signal
                 });
 
+                clearTimeout(timeoutId);
                 const data = await response.json();
 
                 if (response.ok) {
                     msgEl.innerHTML = '<p class="success-msg">✓ 保存成功</p>';
                     document.getElementById('note-content').value = '';
-                    loadNotesList(); // 刷新笔记列表
+                    await loadNotesList(); // 刷新笔记列表
+                    setTimeout(() => msgEl.innerHTML = '', 3000); // 3秒后清除消息
                 } else {
-                    msgEl.innerHTML = `<p class="error-msg">${data.error}</p>`;
+                    msgEl.innerHTML = `<p class="error-msg">${data.error || '保存失败'}</p>`;
                 }
             } catch (error) {
-                msgEl.innerHTML = '<p class="error-msg">保存失败，请检查服务器</p>';
+                if (error.name === 'AbortError') {
+                    msgEl.innerHTML = '<p class="error-msg">保存超时，请重试</p>';
+                } else {
+                    msgEl.innerHTML = '<p class="error-msg">保存失败，请检查网络连接</p>';
+                }
+                console.error('Save error:', error);
+            } finally {
+                isSaving = false;
             }
         }
 
@@ -394,13 +576,49 @@
 
                     let html = '';
                     data.notes.forEach(note => {
+                        const sourceLabel = note.source_type === 'file'
+                            ? `<span style="display: inline-block; padding: 2px 8px; background: #F0F0F0; color: #666; font-size: 12px; border-radius: 4px; margin-right: 8px;">${note.file_type} 文件</span>`
+                            : '';
+
+                        // 显示标题，如果没有标题则显示内容前20个字
+                        const displayTitle = note.title || note.content.substring(0, 20) + (note.content.length > 20 ? '...' : '');
+
+                        // 转义内容用于编辑
+                        const escapedTitle = (note.title || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                        const escapedContent = note.content.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
                         html += `
-                            <div class="source-item" data-id="${note.id}">
-                                <div class="timestamp">${note.timestamp}</div>
-                                <div class="content">${note.content.substring(0, 300)}${note.content.length > 300 ? '...' : ''}</div>
-                                <div class="note-actions">
-                                    <button onclick="editNoteInList('${note.id}', \`${note.content.replace(/`/g, '\\`').replace(/\$/g, '\\$').replace(/\n/g, '\\n')}\`)">编辑</button>
-                                    <button class="delete-btn" onclick="deleteNoteFromList('${note.id}')">删除</button>
+                            <div class="note-item-collapsed" data-id="${note.id}">
+                                <!-- 查看模式 -->
+                                <div id="view-${note.id}" class="note-view-mode">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <div style="flex: 1; cursor: pointer;" onclick="toggleNoteExpand('${note.id}')">
+                                            <div style="font-weight: 500; color: #1A1A1A; margin-bottom: 4px;">${displayTitle}</div>
+                                            <div style="font-size: 12px; color: #999;">${sourceLabel}${note.timestamp}</div>
+                                        </div>
+                                        <div class="note-actions" style="margin: 0;">
+                                            <button onclick="enterEditMode('${note.id}')">编辑</button>
+                                            <button class="delete-btn" onclick="deleteNoteFromList('${note.id}')">删除</button>
+                                        </div>
+                                    </div>
+                                    <div class="note-content-expanded" id="content-${note.id}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E5E5E5;">
+                                        <div class="content">${note.content}</div>
+                                    </div>
+                                </div>
+
+                                <!-- 编辑模式 -->
+                                <div id="edit-${note.id}" class="note-edit-mode" style="display: none;">
+                                    <div style="margin-bottom: 12px;">
+                                        <input type="text" id="edit-title-${note.id}" value="${escapedTitle}" placeholder="笔记标题..." style="width: 100%; padding: 10px; border: 1px solid #E5E5E5; border-radius: 8px; font-size: 14px;">
+                                    </div>
+                                    <div style="margin-bottom: 12px;">
+                                        <textarea id="edit-content-${note.id}" style="width: 100%; min-height: 200px; padding: 12px; border: 1px solid #E5E5E5; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical;">${escapedContent}</textarea>
+                                    </div>
+                                    <div style="display: flex; gap: 8px;">
+                                        <button onclick="saveNoteEdit('${note.id}')" style="padding: 8px 20px; font-size: 14px;">保存</button>
+                                        <button onclick="cancelEditMode('${note.id}')" style="padding: 8px 20px; font-size: 14px; background: #F5F5F5; color: #666;">取消</button>
+                                    </div>
+                                    <div id="edit-msg-${note.id}" style="margin-top: 8px;"></div>
                                 </div>
                             </div>
                         `;
@@ -412,6 +630,66 @@
             } catch (error) {
                 listEl.innerHTML = '<p class="error-msg">加载失败，请检查服务器</p>';
             }
+        }
+
+        function toggleNoteExpand(noteId) {
+            const contentEl = document.getElementById(`content-${noteId}`);
+            if (contentEl.style.display === 'none') {
+                contentEl.style.display = 'block';
+            } else {
+                contentEl.style.display = 'none';
+            }
+        }
+
+        function enterEditMode(noteId) {
+            document.getElementById(`view-${noteId}`).style.display = 'none';
+            document.getElementById(`edit-${noteId}`).style.display = 'block';
+        }
+
+        function cancelEditMode(noteId) {
+            document.getElementById(`view-${noteId}`).style.display = 'block';
+            document.getElementById(`edit-${noteId}`).style.display = 'none';
+            document.getElementById(`edit-msg-${noteId}`).innerHTML = '';
+        }
+
+        async function saveNoteEdit(noteId) {
+            const title = document.getElementById(`edit-title-${noteId}`).value.trim();
+            const content = document.getElementById(`edit-content-${noteId}`).value.trim();
+            const msgEl = document.getElementById(`edit-msg-${noteId}`);
+
+            if (!content) {
+                msgEl.innerHTML = '<p class="error-msg">内容不能为空</p>';
+                return;
+            }
+
+            msgEl.innerHTML = '<p class="loading">保存中...</p>';
+
+            try {
+                const response = await fetch(`/api/notes/${noteId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content, title: title || null })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    msgEl.innerHTML = '<p class="success-msg">✓ 保存成功</p>';
+                    setTimeout(() => {
+                        loadNotesList();
+                    }, 500);
+                } else {
+                    msgEl.innerHTML = `<p class="error-msg">${data.error || '保存失败'}</p>`;
+                }
+            } catch (error) {
+                msgEl.innerHTML = '<p class="error-msg">保存失败，请检查网络连接</p>';
+                console.error('Save error:', error);
+            }
+        }
+
+        function editNote(noteId) {
+            // 保留这个函数以兼容旧代码
+            enterEditMode(noteId);
         }
 
         async function editNoteInList(noteId, content) {
@@ -489,7 +767,9 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    answerBox.innerHTML = `<div class="answer">${data.answer}</div>`;
+                    // 处理答案，添加高亮
+                    let formattedAnswer = formatAnswerWithHighlight(data.answer);
+                    answerBox.innerHTML = `<div class="answer">${formattedAnswer}</div>`;
 
                     if (data.sources && data.sources.length > 0) {
                         let sourcesHtml = '<div class="sources"><h3>来源笔记</h3>';
@@ -499,8 +779,8 @@
                                     <div class="timestamp">${source.timestamp}</div>
                                     <div class="content">${source.content.substring(0, 200)}${source.content.length > 200 ? '...' : ''}</div>
                                     <div class="note-actions">
-                                        <button onclick="editNote('${source.id}', \`${source.content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">编辑</button>
-                                        <button class="delete-btn" onclick="deleteNote('${source.id}')">删除</button>
+                                        <button onclick="enterEditMode('${source.id}')">编辑</button>
+                                        <button class="delete-btn" onclick="deleteNoteFromList('${source.id}')">删除</button>
                                     </div>
                                 </div>
                             `;
@@ -514,6 +794,25 @@
             } catch (error) {
                 answerBox.innerHTML = '<p class="error-msg">请求失败，请检查服务器</p>';
             }
+        }
+
+        function formatAnswerWithHighlight(text) {
+            // 转义 HTML
+            text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+            // 高亮代码块（用反引号包裹的内容）
+            text = text.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+
+            // 高亮重要关键词（加粗的内容）
+            text = text.replace(/\*\*([^*]+)\*\*/g, '<strong class="highlight-text">$1</strong>');
+
+            // 保留换行
+            text = text.replace(/\n/g, '<br>');
+
+            // 高亮列表项
+            text = text.replace(/^- (.+)$/gm, '<span class="list-item">• $1</span>');
+
+            return text;
         }
 
         async function editNote(noteId, content) {
