@@ -25,9 +25,19 @@ db = Database()
 
 # 初始化 Anthropic 客户端
 api_key = os.environ.get('ANTHROPIC_API_KEY')
+base_url = os.environ.get('ANTHROPIC_BASE_URL')
+
 if not api_key:
     print("警告: 未设置 ANTHROPIC_API_KEY 环境变量")
-client = Anthropic(api_key=api_key) if api_key else None
+
+# 根据是否有 base_url 来初始化客户端
+if api_key:
+    if base_url:
+        client = Anthropic(api_key=api_key, base_url=base_url)
+    else:
+        client = Anthropic(api_key=api_key)
+else:
+    client = None
 
 
 @app.route('/')
