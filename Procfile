@@ -1,1 +1,1 @@
-web: gunicorn app:app --limit-request-line 0 --limit-request-field_size 0
+web: gunicorn app:app -c gunicorn_config.py
