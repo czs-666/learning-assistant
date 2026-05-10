@@ -776,6 +776,27 @@
             }
         }
 
+        function highlightKeyword(text, keyword) {
+            if (!text || !keyword) return text || '';
+
+            // 转义 HTML 特殊字符
+            const escapeHtml = (str) => {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            };
+
+            // 转义关键词中的正则特殊字符
+            const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+            const escapedText = escapeHtml(text);
+            const escapedKeyword = escapeRegex(keyword);
+
+            // 使用正则表达式进行不区分大小写的替换
+            const regex = new RegExp(`(${escapedKeyword})`, 'gi');
+            return escapedText.replace(regex, '<mark style="background: #FFF4E6; color: #C9A063; padding: 2px 4px; border-radius: 3px; font-weight: 500;">$1</mark>');
+        }
+
         async function searchQuestion() {
             const keyword = document.getElementById('question').value.trim();
             const resultsBox = document.getElementById('search-results-list');
@@ -807,7 +828,12 @@
                         const sourceLabel = note.source_type === 'file'
                             ? `<span style="display: inline-block; padding: 2px 8px; background: #F0F0F0; color: #666; font-size: 12px; border-radius: 4px; margin-right: 8px;">${note.file_type} 文件</span>`
                             : '';
-                        const displayTitle = note.title || note.content.substring(0, 20) + (note.content.length > 20 ? '...' : '');
+
+                        // 高亮标题和内容中的关键词
+                        const highlightedTitle = highlightKeyword(note.title || note.content.substring(0, 20), keyword);
+                        const displayTitle = highlightedTitle + ((!note.title && note.content.length > 20) ? '...' : '');
+                        const highlightedContent = highlightKeyword(note.content, keyword);
+
                         html += `
                             <div class="note-item-collapsed" data-id="${note.id}">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -821,7 +847,7 @@
                                     </div>
                                 </div>
                                 <div class="note-content-expanded" id="content-${note.id}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E5E5E5;">
-                                    <div class="content">${note.content}</div>
+                                    <div class="content">${highlightedContent}</div>
                                 </div>
                             </div>
                         `;
