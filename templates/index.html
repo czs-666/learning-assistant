@@ -73,6 +73,42 @@
             border-bottom-color: #C9A063;
         }
 
+        /* 搜索框 */
+        .search-input-wrap {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .search-input-wrap input {
+            flex: 1;
+        }
+
+        #search-results-list {
+            margin-top: 24px;
+            max-height: 600px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        #search-results-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #search-results-list::-webkit-scrollbar-track {
+            background: #F5F5F5;
+            border-radius: 3px;
+        }
+
+        #search-results-list::-webkit-scrollbar-thumb {
+            background: #C9A063;
+            border-radius: 3px;
+        }
+
+        #search-results-list::-webkit-scrollbar-thumb:hover {
+            background: #B89053;
+        }
+
         .tab-content {
             display: none;
         }
@@ -358,16 +394,17 @@
     <div class="container">
         <header>
             <h1>学习助手</h1>
-            <p class="subtitle">记录知识，随时问答</p>
+            <p class="subtitle">记录知识，快速搜索</p>
         </header>
 
         <div class="tabs">
             <div class="tab active" onclick="switchTab('notes')">笔记</div>
-            <div class="tab" onclick="switchTab('ask')">问答</div>
+            <div class="tab" onclick="switchTab('search')">搜索</div>
         </div>
 
         <!-- 笔记页面 -->
         <div id="notes-tab" class="tab-content active">
+
             <!-- 添加笔记 -->
             <div class="card">
                 <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 24px;">添加笔记</h2>
@@ -402,20 +439,17 @@
             </div>
         </div>
 
-        <!-- 问答 -->
-        <div id="ask-tab" class="tab-content">
+        <!-- 搜索 -->
+        <div id="search-tab" class="tab-content">
             <div class="card">
                 <div class="form-group">
-                    <label>你的问题</label>
-                    <input type="text" id="question" placeholder="例如：BE代码是什么意思？">
+                    <label>搜索关键词</label>
+                    <div class="search-input-wrap">
+                        <input type="text" id="question" placeholder="输入关键词搜索笔记..." onkeypress="if(event.key==='Enter') searchQuestion()">
+                        <button onclick="searchQuestion()">搜索</button>
+                    </div>
                 </div>
-                <button onclick="askQuestion()">提问</button>
-
-                <div id="answer-box" class="result-box empty">
-                    答案会显示在这里
-                </div>
-
-                <div id="sources-box"></div>
+                <div id="search-results-list"></div>
             </div>
         </div>
     </div>
@@ -432,7 +466,7 @@
                 loadNotesList();
             } else {
                 document.querySelectorAll('.tab')[1].classList.add('active');
-                document.getElementById('ask-tab').classList.add('active');
+                document.getElementById('search-tab').classList.add('active');
             }
         }
 
@@ -742,141 +776,69 @@
             }
         }
 
-        async function askQuestion() {
-            const question = document.getElementById('question').value.trim();
-            const answerBox = document.getElementById('answer-box');
-            const sourcesBox = document.getElementById('sources-box');
+        async function searchQuestion() {
+            const keyword = document.getElementById('question').value.trim();
+            const resultsBox = document.getElementById('search-results-list');
 
-            if (!question) {
-                answerBox.className = 'result-box';
-                answerBox.innerHTML = '<p class="error-msg">请输入问题</p>';
+            if (!keyword) {
+                resultsBox.innerHTML = '<p class="error-msg">请输入搜索关键词</p>';
                 return;
             }
 
-            answerBox.className = 'result-box';
-            answerBox.innerHTML = '<p class="loading">思考中...</p>';
-            sourcesBox.innerHTML = '';
+            resultsBox.innerHTML = '<p class="loading">搜索中...</p>';
 
             try {
                 const response = await fetch('/api/ask', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ question })
+                    body: JSON.stringify({ question: keyword })
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    // 处理答案，添加高亮
-                    let formattedAnswer = formatAnswerWithHighlight(data.answer);
-                    answerBox.innerHTML = `<div class="answer">${formattedAnswer}</div>`;
+                    if (!data.results || data.results.length === 0) {
+                        resultsBox.innerHTML = '<p style="color: #999999; text-align: center; padding: 40px 0;">没有找到相关笔记</p>';
+                        return;
+                    }
 
-                    if (data.sources && data.sources.length > 0) {
-                        let sourcesHtml = '<div class="sources"><h3>来源笔记</h3>';
-                        data.sources.forEach(source => {
-                            sourcesHtml += `
-                                <div class="source-item" data-id="${source.id}">
-                                    <div class="timestamp">${source.timestamp}</div>
-                                    <div class="content">${source.content.substring(0, 200)}${source.content.length > 200 ? '...' : ''}</div>
-                                    <div class="note-actions">
-                                        <button onclick="enterEditMode('${source.id}')">编辑</button>
-                                        <button class="delete-btn" onclick="deleteNoteFromList('${source.id}')">删除</button>
+                    let html = '';
+                    data.results.forEach(note => {
+                        const sourceLabel = note.source_type === 'file'
+                            ? `<span style="display: inline-block; padding: 2px 8px; background: #F0F0F0; color: #666; font-size: 12px; border-radius: 4px; margin-right: 8px;">${note.file_type} 文件</span>`
+                            : '';
+                        const displayTitle = note.title || note.content.substring(0, 20) + (note.content.length > 20 ? '...' : '');
+                        html += `
+                            <div class="note-item-collapsed" data-id="${note.id}">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="flex: 1; cursor: pointer;" onclick="toggleNoteExpand('${note.id}')">
+                                        <div style="font-weight: 500; color: #1A1A1A; margin-bottom: 4px;">${displayTitle}</div>
+                                        <div style="font-size: 12px; color: #999;">${sourceLabel}${note.timestamp}</div>
+                                    </div>
+                                    <div class="note-actions" style="margin: 0;">
+                                        <button onclick="enterEditMode('${note.id}')">编辑</button>
+                                        <button class="delete-btn" onclick="deleteNoteFromList('${note.id}')">删除</button>
                                     </div>
                                 </div>
-                            `;
-                        });
-                        sourcesHtml += '</div>';
-                        sourcesBox.innerHTML = sourcesHtml;
-                    }
+                                <div class="note-content-expanded" id="content-${note.id}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E5E5E5;">
+                                    <div class="content">${note.content}</div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    resultsBox.innerHTML = html;
                 } else {
-                    answerBox.innerHTML = `<p class="error-msg">${data.error}</p>`;
+                    resultsBox.innerHTML = `<p class="error-msg">${data.error || '搜索失败'}</p>`;
                 }
             } catch (error) {
-                answerBox.innerHTML = '<p class="error-msg">请求失败，请检查服务器</p>';
-            }
-        }
-
-        function formatAnswerWithHighlight(text) {
-            // 转义 HTML
-            text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-            // 高亮代码块（用反引号包裹的内容）
-            text = text.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
-
-            // 高亮重要关键词（加粗的内容）
-            text = text.replace(/\*\*([^*]+)\*\*/g, '<strong class="highlight-text">$1</strong>');
-
-            // 保留换行
-            text = text.replace(/\n/g, '<br>');
-
-            // 高亮列表项
-            text = text.replace(/^- (.+)$/gm, '<span class="list-item">• $1</span>');
-
-            return text;
-        }
-
-        async function editNote(noteId, content) {
-            const newContent = prompt('编辑笔记内容：', content);
-
-            if (newContent === null || newContent.trim() === '') {
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/notes/${noteId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: newContent.trim() })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    alert('✓ 更新成功');
-                    // 刷新当前问题的答案
-                    const question = document.getElementById('question').value;
-                    if (question) {
-                        askQuestion();
-                    }
-                } else {
-                    alert('更新失败：' + data.error);
-                }
-            } catch (error) {
-                alert('更新失败，请检查服务器');
-            }
-        }
-
-        async function deleteNote(noteId) {
-            if (!confirm('确定要删除这条笔记吗？')) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/notes/${noteId}`, {
-                    method: 'DELETE'
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    alert('✓ 删除成功');
-                    // 移除该笔记卡片
-                    const noteElement = document.querySelector(`[data-id="${noteId}"]`);
-                    if (noteElement) {
-                        noteElement.remove();
-                    }
-                } else {
-                    alert('删除失败：' + data.error);
-                }
-            } catch (error) {
-                alert('删除失败，请检查服务器');
+                resultsBox.innerHTML = '<p class="error-msg">请求失败，请检查服务器</p>';
             }
         }
 
         // 回车提交
         document.getElementById('question').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                askQuestion();
+                searchQuestion();
             }
         });
 

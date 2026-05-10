@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 from datetime import datetime
 from werkzeug.utils import secure_filename
-from anthropic import Anthropic
 from database import Database
 from file_handler import FileHandler
 
@@ -22,28 +21,6 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB 最大文件大小
 
 # 初始化数据库
 db = Database()
-
-# 初始化 Anthropic 客户端
-api_key = os.environ.get('ANTHROPIC_API_KEY')
-base_url = os.environ.get('ANTHROPIC_BASE_URL')
-
-print(f"API Key 存在: {bool(api_key)}")
-print(f"Base URL: {base_url}")
-
-if not api_key:
-    print("警告: 未设置 ANTHROPIC_API_KEY 环境变量")
-
-# 根据是否有 base_url 来初始化客户端
-if api_key:
-    if base_url:
-        client = Anthropic(api_key=api_key, base_url=base_url)
-        print("Anthropic 客户端已初始化（使用自定义 base_url）")
-    else:
-        client = Anthropic(api_key=api_key)
-        print("Anthropic 客户端已初始化（使用默认 base_url）")
-else:
-    client = None
-    print("Anthropic 客户端未初始化")
 
 
 @app.route('/')
@@ -87,61 +64,19 @@ def search():
 
 @app.route('/api/ask', methods=['POST'])
 def ask():
-    """问答"""
+    """搜索笔记"""
     if not request.json:
         return jsonify({'error': '无效的请求数据'}), 400
 
-    question = (request.json.get('question') or '').strip()
+    keyword = (request.json.get('question') or '').strip()
 
-    if not question:
-        return jsonify({'error': '问题不能为空'}), 400
-
-    if not client:
-        return jsonify({'error': '未配置 API Key'}), 500
+    if not keyword:
+        return jsonify({'error': '关键词不能为空'}), 400
 
     # 搜索相关笔记
-    results = db.search_notes(question)[:3]
+    results = db.search_notes(keyword)
 
-    if not results:
-        return jsonify({
-            'answer': '抱歉，我在你的笔记中没有找到相关内容。\n\n建议：\n- 尝试用不同的关键词提问\n- 先添加相关的学习笔记',
-            'sources': [],
-            'no_results': True
-        })
-
-    # 构建上下文
-    context = "\n\n".join([f"笔记 {i+1}:\n{note['content']}" for i, note in enumerate(results)])
-
-    # 调用 Claude
-    try:
-        response = client.messages.create(
-            model='claude-sonnet-4-6',
-            max_tokens=1500,
-            system=f"""你是一个学习助手。用户会问关于他学习笔记的问题。
-
-重要规则：
-1. 只基于提供的笔记内容回答问题
-2. 如果笔记中没有相关信息，明确说"笔记中没有找到相关内容"
-3. 不要凭空编造或使用笔记外的知识
-4. 回答时引用具体的笔记内容
-
-用户的笔记：
-{context}""",
-            messages=[{
-                'role': 'user',
-                'content': question
-            }]
-        )
-
-        answer = response.content[0].text
-
-        return jsonify({
-            'answer': answer,
-            'sources': results
-        })
-
-    except Exception as e:
-        return jsonify({'error': f'API 调用失败: {str(e)}'}), 500
+    return jsonify({'results': results})
 
 
 @app.route('/api/notes/<note_id>', methods=['PUT'])
