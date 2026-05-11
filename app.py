@@ -17,7 +17,7 @@ app = Flask(__name__)
 UPLOAD_FOLDER = Path(__file__).parent / 'data' / 'uploads'
 UPLOAD_FOLDER.mkdir(exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 40 * 1024 * 1024  # 40MB 最大文件大小
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB 最大文件大小
 
 # 初始化数据库
 db = Database()
@@ -125,6 +125,7 @@ def upload_file():
     if not FileHandler.is_supported(file.filename):
         return jsonify({'error': '不支持的文件格式，仅支持 PDF、Word、TXT、Markdown'}), 400
 
+    file_path = None
     try:
         # 保存文件
         filename = secure_filename(file.filename)
@@ -153,11 +154,17 @@ def upload_file():
 
     except Exception as e:
         # 如果出错，删除已保存的文件
-        if file_path.exists():
+        if file_path and file_path.exists():
             file_path.unlink()
+
+        # 打印详细错误信息到控制台
+        import traceback
+        print(f"上传错误: {str(e)}")
+        print(traceback.format_exc())
+
         return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=True)

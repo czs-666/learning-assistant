@@ -503,6 +503,13 @@
                 });
 
                 clearTimeout(timeoutId);
+
+                // 处理 413 文件过大错误
+                if (response.status === 413) {
+                    msgEl.innerHTML = '<p class="error-msg">文件太大，最大支持 100MB</p>';
+                    return false;
+                }
+
                 const data = await response.json();
 
                 if (response.ok) {

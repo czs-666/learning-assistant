@@ -6,7 +6,7 @@
 import os
 from pathlib import Path
 from typing import Optional, Tuple
-import PyPDF2
+from pypdf import PdfReader
 from docx import Document
 
 
@@ -27,7 +27,7 @@ class FileHandler:
         try:
             text_content = []
             with open(file_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
+                pdf_reader = PdfReader(file)
                 for page in pdf_reader.pages:
                     text = page.extract_text()
                     if text:
