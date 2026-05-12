@@ -118,34 +118,56 @@ def upload_file():
 
     file = request.files['file']
 
-    if file.filename == '':
-        return jsonify({'error': '未选择文件'}), 400
+    # 获取原始文件名
+    original_filename = file.filename
+    print(f"[DEBUG] 原始文件名: {original_filename}")
+
+    if not original_filename or original_filename == '':
+        return jsonify({'error': '未获取到文件名'}), 400
 
     # 检查文件类型
-    if not FileHandler.is_supported(file.filename):
-        return jsonify({'error': '不支持的文件格式，仅支持 PDF、Word、TXT、Markdown'}), 400
+    if not FileHandler.is_supported(original_filename):
+        return jsonify({'error': f'不支持的文件格式：{original_filename}，仅支持 PDF、Word、TXT、Markdown'}), 400
 
     file_path = None
     try:
-        # 保存文件
-        filename = secure_filename(file.filename)
+        # 保存文件 - 先获取扩展名
+        original_filename = file.filename
+        file_ext = Path(original_filename).suffix.lower()  # 获取扩展名（如 .pdf）
+
+        # 使用 secure_filename 处理文件名
+        filename = secure_filename(original_filename)
+        print(f"[DEBUG] 安全文件名: {filename}")
+
+        # 如果 secure_filename 返回空（中文文件名会被清空），使用时间戳+扩展名
+        if not filename or filename == '':
+            filename = f"upload{file_ext}"
+            print(f"[DEBUG] 文件名为空，使用默认名称: {filename}")
+
+        # 确保文件名有扩展名
+        if not filename.endswith(file_ext):
+            filename = Path(filename).stem + file_ext
+            print(f"[DEBUG] 添加扩展名后: {filename}")
+
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         unique_filename = f"{timestamp}_{filename}"
         file_path = app.config['UPLOAD_FOLDER'] / unique_filename
+        print(f"[DEBUG] 保存路径: {file_path}")
         file.save(file_path)
 
         # 提取文本
         text_content, file_type = FileHandler.extract_text(str(file_path))
 
-        # 使用文件名（去掉扩展名）作为标题
-        title = Path(filename).stem
+        # 使用原始文件名（去掉扩展名）作为标题
+        title = Path(original_filename).stem
+        print(f"[DEBUG] 笔记标题: {title}")
 
         # 保存到数据库
         note = db.add_note(
             content=text_content,
             source_type='file',
             title=title,
-            file_name=filename,
+            file_name=original_filename,  # 保存原始文件名
             file_type=file_type,
             file_path=str(file_path)
         )
@@ -159,8 +181,16 @@ def upload_file():
 
         # 打印详细错误信息到控制台
         import traceback
-        print(f"上传错误: {str(e)}")
+        error_msg = f"上传错误: {str(e)}"
+        print(error_msg)
         print(traceback.format_exc())
+
+        # 同时写入日志文件
+        with open('upload_error.log', 'a', encoding='utf-8') as log:
+            log.write(f"\n{'='*50}\n")
+            log.write(f"Time: {datetime.now()}\n")
+            log.write(f"Error: {str(e)}\n")
+            log.write(traceback.format_exc())
 
         return jsonify({'error': str(e)}), 500
 
