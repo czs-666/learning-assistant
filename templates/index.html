@@ -84,6 +84,40 @@
             flex: 1;
         }
 
+        .search-mode-toggle {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            padding: 6px;
+            background: #FAFAFA;
+            border-radius: 12px;
+            width: fit-content;
+        }
+
+        .mode-btn {
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #666666;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .mode-btn:hover {
+            color: #1A1A1A;
+            background: #FFFFFF;
+            transform: none;
+        }
+
+        .mode-btn.active {
+            color: #1A1A1A;
+            background: #FFFFFF;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
         #search-results-list {
             margin-top: 24px;
             max-height: 600px;
@@ -399,7 +433,7 @@
 
         <div class="tabs">
             <div class="tab active" onclick="switchTab('notes')">笔记</div>
-            <div class="tab" onclick="switchTab('search')">搜索</div>
+            <div class="tab" onclick="switchTab('search')">搜索与问答</div>
         </div>
 
         <!-- 笔记页面 -->
@@ -439,16 +473,28 @@
             </div>
         </div>
 
-        <!-- 搜索 -->
+        <!-- 搜索与问答 -->
         <div id="search-tab" class="tab-content">
             <div class="card">
+                <!-- 模式切换 -->
+                <div class="search-mode-toggle">
+                    <button class="mode-btn active" onclick="switchSearchMode('keyword')">关键词搜索</button>
+                    <button class="mode-btn" onclick="switchSearchMode('ai')">AI 问答</button>
+                </div>
+
+                <!-- 搜索输入区 -->
                 <div class="form-group">
-                    <label>搜索关键词</label>
+                    <label id="search-label">搜索关键词</label>
                     <div class="search-input-wrap">
-                        <input type="text" id="question" placeholder="输入关键词搜索笔记..." onkeypress="if(event.key==='Enter') searchQuestion()">
-                        <button onclick="searchQuestion()">搜索</button>
+                        <input type="text" id="search-input" placeholder="输入关键词搜索笔记..." onkeypress="if(event.key==='Enter') performSearch()">
+                        <button onclick="performSearch()" id="search-btn">搜索</button>
+                    </div>
+                    <div style="margin-top: 8px; font-size: 13px; color: #999999;" id="search-hint">
+                        快速查找笔记中的关键词，支持高亮显示
                     </div>
                 </div>
+
+                <!-- 结果显示区 -->
                 <div id="search-results-list"></div>
             </div>
         </div>
@@ -467,6 +513,157 @@
             } else {
                 document.querySelectorAll('.tab')[1].classList.add('active');
                 document.getElementById('search-tab').classList.add('active');
+            }
+        }
+
+        let currentSearchMode = 'keyword'; // 'keyword' 或 'ai'
+
+        function switchSearchMode(mode) {
+            currentSearchMode = mode;
+
+            // 更新按钮状态
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // 更新界面文本
+            const label = document.getElementById('search-label');
+            const input = document.getElementById('search-input');
+            const hint = document.getElementById('search-hint');
+            const btn = document.getElementById('search-btn');
+
+            if (mode === 'keyword') {
+                label.textContent = '搜索关键词';
+                input.placeholder = '输入关键词搜索笔记...';
+                hint.textContent = '快速查找笔记中的关键词，支持高亮显示';
+                btn.textContent = '搜索';
+            } else {
+                label.textContent = '向 AI 提问';
+                input.placeholder = '问我任何关于你笔记的问题...';
+                hint.textContent = 'AI 会基于你的笔记内容给出智能回答';
+                btn.textContent = '提问';
+            }
+
+            // 清空结果
+            document.getElementById('search-results-list').innerHTML = '';
+        }
+
+        function performSearch() {
+            if (currentSearchMode === 'keyword') {
+                searchQuestion();
+            } else {
+                askAI();
+            }
+        }
+
+        async function searchQuestion() {
+            const keyword = document.getElementById('search-input').value.trim();
+            const resultsBox = document.getElementById('search-results-list');
+
+            if (!keyword) {
+                resultsBox.innerHTML = '<p class="error-msg">请输入搜索关键词</p>';
+                return;
+            }
+
+            resultsBox.innerHTML = '<p class="loading">搜索中...</p>';
+
+            try {
+                const response = await fetch(`/api/search?q=${encodeURIComponent(keyword)}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (!data.results || data.results.length === 0) {
+                        resultsBox.innerHTML = '<p style="color: #999999; text-align: center; padding: 40px 0;">没有找到相关笔记</p>';
+                        return;
+                    }
+
+                    let html = '';
+                    data.results.forEach(note => {
+                        const sourceLabel = note.source_type === 'file'
+                            ? `<span style="display: inline-block; padding: 2px 8px; background: #F0F0F0; color: #666; font-size: 12px; border-radius: 4px; margin-right: 8px;">${note.file_type} 文件</span>`
+                            : '';
+
+                        // 高亮标题和内容中的关键词
+                        const highlightedTitle = highlightKeyword(note.title || note.content.substring(0, 20), keyword);
+                        const displayTitle = highlightedTitle + ((!note.title && note.content.length > 20) ? '...' : '');
+                        const highlightedContent = highlightKeyword(note.content, keyword);
+
+                        html += `
+                            <div class="note-item-collapsed" data-id="${note.id}">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="flex: 1; cursor: pointer;" onclick="toggleNoteExpand('${note.id}')">
+                                        <div style="font-weight: 500; color: #1A1A1A; margin-bottom: 4px;">${displayTitle}</div>
+                                        <div style="font-size: 12px; color: #999;">${sourceLabel}${note.timestamp}</div>
+                                    </div>
+                                    <div class="note-actions" style="margin: 0;">
+                                        <button onclick="enterEditMode('${note.id}')">编辑</button>
+                                        <button class="delete-btn" onclick="deleteNoteFromList('${note.id}')">删除</button>
+                                    </div>
+                                </div>
+                                <div class="note-content-expanded" id="content-${note.id}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E5E5E5;">
+                                    <div class="content">${highlightedContent}</div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    resultsBox.innerHTML = html;
+                } else {
+                    resultsBox.innerHTML = `<p class="error-msg">${data.error || '搜索失败'}</p>`;
+                }
+            } catch (error) {
+                resultsBox.innerHTML = '<p class="error-msg">请求失败，请检查服务器</p>';
+            }
+        }
+
+        async function askAI() {
+            const question = document.getElementById('search-input').value.trim();
+            const answerBox = document.getElementById('search-results-list');
+
+            if (!question) {
+                answerBox.innerHTML = '<p class="error-msg">请输入问题</p>';
+                return;
+            }
+
+            answerBox.innerHTML = '<p class="loading">AI 正在思考中...</p>';
+
+            try {
+                const response = await fetch('/api/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    let html = '<div class="result-box">';
+                    html += `<div class="answer">${data.answer.replace(/\n/g, '<br>')}</div>`;
+
+                    if (data.sources && data.sources.length > 0) {
+                        html += '<div class="sources"><h3>参考笔记</h3>';
+                        data.sources.forEach(note => {
+                            const sourceLabel = note.source_type === 'file'
+                                ? `<span style="display: inline-block; padding: 2px 8px; background: #F0F0F0; color: #666; font-size: 12px; border-radius: 4px; margin-right: 8px;">${note.file_type} 文件</span>`
+                                : '';
+                            const displayTitle = note.title || note.content.substring(0, 30) + '...';
+
+                            html += `
+                                <div class="source-item">
+                                    <div class="timestamp">${sourceLabel}${note.timestamp}</div>
+                                    <div style="font-weight: 500; margin-bottom: 8px;">${displayTitle}</div>
+                                    <div class="content">${note.content.substring(0, 200)}${note.content.length > 200 ? '...' : ''}</div>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                    }
+                    html += '</div>';
+                    answerBox.innerHTML = html;
+                } else {
+                    answerBox.innerHTML = `<p class="error-msg">${data.error || 'AI 回答失败'}</p>`;
+                }
+            } catch (error) {
+                answerBox.innerHTML = '<p class="error-msg">请求失败，请检查服务器</p>';
+                console.error('AI error:', error);
             }
         }
 
@@ -807,7 +1004,7 @@
         }
 
         async function searchQuestion() {
-            const keyword = document.getElementById('question').value.trim();
+            const keyword = document.getElementById('search-input').value.trim();
             const resultsBox = document.getElementById('search-results-list');
 
             if (!keyword) {
@@ -818,11 +1015,7 @@
             resultsBox.innerHTML = '<p class="loading">搜索中...</p>';
 
             try {
-                const response = await fetch('/api/ask', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ question: keyword })
-                });
+                const response = await fetch(`/api/search?q=${encodeURIComponent(keyword)}`);
 
                 const data = await response.json();
 
@@ -871,9 +1064,9 @@
         }
 
         // 回车提交
-        document.getElementById('question').addEventListener('keypress', (e) => {
+        document.getElementById('search-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                searchQuestion();
+                performSearch();
             }
         });
 

@@ -10,8 +10,22 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 from database import Database
 from file_handler import FileHandler
+from ai_assistant import AIAssistant
 
 app = Flask(__name__)
+
+# 初始化 AI 助手
+ai_assistant = None
+try:
+    # 从环境变量读取 API key
+    api_key = os.environ.get('GLM_API_KEY')
+    if api_key:
+        ai_assistant = AIAssistant(api_key=api_key)
+        print("AI 助手初始化成功 (GLM-4)")
+    else:
+        print("未设置 GLM_API_KEY 环境变量，AI 功能将不可用")
+except Exception as e:
+    print(f"AI 助手初始化失败: {e}")
 
 # 配置文件上传
 UPLOAD_FOLDER = Path(__file__).parent / 'data' / 'uploads'
@@ -64,19 +78,34 @@ def search():
 
 @app.route('/api/ask', methods=['POST'])
 def ask():
-    """搜索笔记"""
+    """AI 智能问答"""
     if not request.json:
         return jsonify({'error': '无效的请求数据'}), 400
 
-    keyword = (request.json.get('question') or '').strip()
+    question = (request.json.get('question') or '').strip()
 
-    if not keyword:
-        return jsonify({'error': '关键词不能为空'}), 400
+    if not question:
+        return jsonify({'error': '问题不能为空'}), 400
 
-    # 搜索相关笔记
-    results = db.search_notes(keyword)
+    # 检查 AI 助手是否可用
+    if not ai_assistant:
+        return jsonify({'error': 'AI 功能暂时不可用'}), 503
 
-    return jsonify({'results': results})
+    try:
+        # 搜索相关笔记作为上下文
+        context_notes = db.search_notes(question)
+
+        # 调用 AI 生成回答
+        answer = ai_assistant.ask(question, context_notes)
+
+        return jsonify({
+            'answer': answer,
+            'sources': context_notes
+        })
+
+    except Exception as e:
+        print(f"AI 问答错误: {e}")
+        return jsonify({'error': f'AI 回答失败: {str(e)}'}), 500
 
 
 @app.route('/api/notes/<note_id>', methods=['PUT'])
