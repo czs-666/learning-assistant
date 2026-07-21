@@ -27,7 +27,7 @@ def _call_deepseek(model, messages, api_key, max_tokens=2000, temperature=0.7):
 
     try:
         cmd = [
-            "curl.exe", "-s", "--connect-timeout", "10", "--max-time", "120",
+            "curl", "-s", "--connect-timeout", "10", "--max-time", "120",
             "https://api.deepseek.com/v1/chat/completions",
             "-H", "Content-Type: application/json",
             "-H", f"Authorization: Bearer {api_key}",
