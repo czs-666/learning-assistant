@@ -4,49 +4,29 @@ AI 助手模块 - 使用 DeepSeek API 进行智能问答
 """
 
 import os
-import json
-import subprocess
-import tempfile
+import requests
 
 
 def _call_deepseek(model, messages, api_key, max_tokens=2000, temperature=0.7):
-    """通过 curl 调用 DeepSeek API（绕过 Python TLS 指纹问题）"""
-    payload = json.dumps({
-        "model": model,
-        "messages": messages,
-        "max_tokens": max_tokens,
-        "temperature": temperature
-    }, ensure_ascii=False)
-
-    # Windows cmd 有长度限制，长 body 用临时文件传
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", encoding="utf-8", delete=False
-    ) as f:
-        f.write(payload)
-        tmp_path = f.name
-
-    try:
-        cmd = [
-            "curl", "-s", "--connect-timeout", "10", "--max-time", "120",
-            "https://api.deepseek.com/v1/chat/completions",
-            "-H", "Content-Type: application/json",
-            "-H", f"Authorization: Bearer {api_key}",
-            "-d", f"@{tmp_path}"
-        ]
-
-        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', timeout=130)
-        if result.returncode != 0:
-            raise Exception(f"curl 调用失败: {result.stderr}")
-
-        data = json.loads(result.stdout)
-        if "error" in data:
-            raise Exception(f"API 错误: {data['error']}")
-        return data["choices"][0]["message"]["content"]
-    finally:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+    """调用 DeepSeek API"""
+    resp = requests.post(
+        "https://api.deepseek.com/v1/chat/completions",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        json={
+            "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        },
+        timeout=120,
+    )
+    data = resp.json()
+    if "error" in data:
+        raise Exception(f"API 错误: {data['error']}")
+    return data["choices"][0]["message"]["content"]
 
 
 class AIAssistant:
