@@ -215,6 +215,21 @@ class Database:
 
         return results[:10]
 
+    def get_note_by_id(self, note_id: str) -> Optional[Dict]:
+        """根据 ID 获取单条笔记"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT id, content, timestamp, source_type, title, file_name, file_type, file_path '
+            'FROM notes WHERE id = ?',
+            (int(note_id),)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        if row is None:
+            return None
+        return _row_to_dict(row)
+
     def update_note(self, note_id: str, content: str, title: str = None) -> Optional[Dict]:
         """更新笔记"""
         conn = self._get_connection()

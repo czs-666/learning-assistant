@@ -555,65 +555,6 @@
             }
         }
 
-        async function searchQuestion() {
-            const keyword = document.getElementById('search-input').value.trim();
-            const resultsBox = document.getElementById('search-results-list');
-
-            if (!keyword) {
-                resultsBox.innerHTML = '<p class="error-msg">请输入搜索关键词</p>';
-                return;
-            }
-
-            resultsBox.innerHTML = '<p class="loading">搜索中...</p>';
-
-            try {
-                const response = await fetch(`/api/search?q=${encodeURIComponent(keyword)}`);
-                const data = await response.json();
-
-                if (response.ok) {
-                    if (!data.results || data.results.length === 0) {
-                        resultsBox.innerHTML = '<p style="color: #999999; text-align: center; padding: 40px 0;">没有找到相关笔记</p>';
-                        return;
-                    }
-
-                    let html = '';
-                    data.results.forEach(note => {
-                        const sourceLabel = note.source_type === 'file'
-                            ? `<span style="display: inline-block; padding: 2px 8px; background: #F0F0F0; color: #666; font-size: 12px; border-radius: 4px; margin-right: 8px;">${note.file_type} 文件</span>`
-                            : '';
-
-                        // 高亮标题和内容中的关键词
-                        const highlightedTitle = highlightKeyword(note.title || note.content.substring(0, 20), keyword);
-                        const displayTitle = highlightedTitle + ((!note.title && note.content.length > 20) ? '...' : '');
-                        const highlightedContent = highlightKeyword(note.content, keyword);
-
-                        html += `
-                            <div class="note-item-collapsed" data-id="${note.id}">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div style="flex: 1; cursor: pointer;" onclick="toggleNoteExpand('${note.id}')">
-                                        <div style="font-weight: 500; color: #1A1A1A; margin-bottom: 4px;">${displayTitle}</div>
-                                        <div style="font-size: 12px; color: #999;">${sourceLabel}${note.timestamp}</div>
-                                    </div>
-                                    <div class="note-actions" style="margin: 0;">
-                                        <button onclick="enterEditMode('${note.id}')">编辑</button>
-                                        <button class="delete-btn" onclick="deleteNoteFromList('${note.id}')">删除</button>
-                                    </div>
-                                </div>
-                                <div class="note-content-expanded" id="content-${note.id}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E5E5E5;">
-                                    <div class="content">${highlightedContent}</div>
-                                </div>
-                            </div>
-                        `;
-                    });
-                    resultsBox.innerHTML = html;
-                } else {
-                    resultsBox.innerHTML = `<p class="error-msg">${data.error || '搜索失败'}</p>`;
-                }
-            } catch (error) {
-                resultsBox.innerHTML = '<p class="error-msg">请求失败，请检查服务器</p>';
-            }
-        }
-
         async function askAI() {
             const question = document.getElementById('search-input').value.trim();
             const answerBox = document.getElementById('search-results-list');
@@ -837,6 +778,7 @@
                                             <div style="font-size: 12px; color: #999;">${sourceLabel}${note.timestamp}</div>
                                         </div>
                                         <div class="note-actions" style="margin: 0;">
+                                            ${note.source_type === 'file' && note.file_path ? `<a href="/api/notes/${note.id}/file" target="_blank" style="padding: 6px 16px; font-size: 13px; background: #F5F5F5; color: #666; border: 1px solid #E5E5E5; border-radius: 24px; text-decoration: none; display: inline-block;">查看原文</a>` : ''}
                                             <button onclick="enterEditMode('${note.id}')">编辑</button>
                                             <button class="delete-btn" onclick="deleteNoteFromList('${note.id}')">删除</button>
                                         </div>
@@ -1044,11 +986,12 @@
                                         <div style="font-size: 12px; color: #999;">${sourceLabel}${note.timestamp}</div>
                                     </div>
                                     <div class="note-actions" style="margin: 0;">
+                                        ${note.source_type === 'file' && note.file_path ? `<a href="/api/notes/${note.id}/file" target="_blank" style="padding: 6px 16px; font-size: 13px; background: #F5F5F5; color: #666; border: 1px solid #E5E5E5; border-radius: 24px; text-decoration: none; display: inline-block;">查看原文</a>` : ''}
                                         <button onclick="enterEditMode('${note.id}')">编辑</button>
                                         <button class="delete-btn" onclick="deleteNoteFromList('${note.id}')">删除</button>
                                     </div>
                                 </div>
-                                <div class="note-content-expanded" id="content-${note.id}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #E5E5E5;">
+                                <div class="note-content-expanded" id="content-${note.id}" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #E5E5E5;">
                                     <div class="content">${highlightedContent}</div>
                                 </div>
                             </div>

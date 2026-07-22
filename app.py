@@ -3,7 +3,7 @@
 学习助手 - 个人知识库问答系统
 """
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -128,6 +128,24 @@ def update_note(note_id):
         return jsonify({'error': '笔记不存在'}), 404
 
     return jsonify({'success': True, 'note': note})
+
+
+@app.route('/api/notes/<note_id>/file')
+def get_note_file(note_id):
+    """返回笔记关联的原始文件"""
+    note = db.get_note_by_id(note_id)
+    if not note or not note.get('file_path'):
+        return jsonify({'error': '文件不存在'}), 404
+
+    file_path = Path(note['file_path'])
+    if not file_path.exists():
+        return jsonify({'error': '文件已丢失'}), 404
+
+    return send_from_directory(
+        file_path.parent,
+        file_path.name,
+        download_name=note.get('file_name') or file_path.name
+    )
 
 
 @app.route('/api/notes/<note_id>', methods=['DELETE'])
